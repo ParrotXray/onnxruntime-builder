@@ -40,24 +40,15 @@ jobs:
         include:
           - name: linux-x64-avx2
             runs-on: ubuntu-24.04
-            cmake_flags: >-
-              onnxruntime_USE_AVX=ON
-              onnxruntime_USE_AVX2=ON
-              onnxruntime_USE_AVX512=OFF
+            cmake_flags: "onnxruntime_USE_AVX=ON onnxruntime_USE_AVX2=ON onnxruntime_USE_AVX512=OFF"
 
           - name: linux-x64-noavx2
             runs-on: ubuntu-24.04
-            cmake_flags: >-
-              onnxruntime_USE_AVX=OFF
-              onnxruntime_USE_AVX2=OFF
-              onnxruntime_USE_AVX512=OFF
+            cmake_flags: "onnxruntime_USE_AVX=OFF onnxruntime_USE_AVX2=OFF onnxruntime_USE_AVX512=OFF"
 
           - name: linux-arm64
             runs-on: ubuntu-24.04-arm
-            cmake_flags: >-
-              onnxruntime_USE_AVX=OFF
-              onnxruntime_USE_AVX2=OFF
-              onnxruntime_USE_AVX512=OFF
+            cmake_flags: "onnxruntime_USE_AVX=OFF onnxruntime_USE_AVX2=OFF onnxruntime_USE_AVX512=OFF"
 
     runs-on: ${{ matrix.runs-on }}
     name: Build (${{ matrix.name }})
@@ -79,15 +70,13 @@ jobs:
       - name: Build
         run: |
           cd onnxruntime
-          EXTRA_DEFINES=$(echo "${{ matrix.cmake_flags }}" | \
-            tr ' ' '\n' | sed 's/^/-D/' | tr '\n' ' ')
           ./build.sh \
             --config Release \
             --build_shared_lib \
             --parallel \
             --skip_tests \
             --compile_no_warning_as_error \
-            --cmake_extra_defines $EXTRA_DEFINES
+            --cmake_extra_defines ${{ matrix.cmake_flags }}
 
       - name: Collect artifacts
         run: |
