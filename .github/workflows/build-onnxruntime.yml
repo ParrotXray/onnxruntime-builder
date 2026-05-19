@@ -1,6 +1,11 @@
 name: Build OnnxRuntime Multi-Target
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-onnxruntime.yml'
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
