@@ -45,7 +45,7 @@ Download the appropriate release asset for your target machine:
 
 ```bash
 # Example: Linux x86_64 without AVX2
-wget https://github.com/<your-username>/onnxruntime-builder/releases/download/<version>-custom/linux-amd64-noavx2-<version>.tar.gz
+wget https://github.com/ParrotXray/onnxruntime-builder/releases/download/<version>-custom/linux-amd64-noavx2-<version>.tar.gz
 tar -xzf linux-amd64-noavx2-<version>.tar.gz
 ```
 
