@@ -1,0 +1,144 @@
+name: Build OnnxRuntime Multi-Target
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.upstream.outputs.version }}
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest OnnxRuntime release
+        id: upstream
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/microsoft/onnxruntime/releases/latest \
+            | jq -r '.tag_name')
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Check if already built
+        id: check
+        run: |
+          LAST=$(cat .last-built-version 2>/dev/null || echo "none")
+          if [ "$LAST" = "${{ steps.upstream.outputs.version }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.skip == 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64-avx2
+            runs-on: ubuntu-24.04
+            cmake_flags: >-
+              onnxruntime_USE_AVX=ON
+              onnxruntime_USE_AVX2=ON
+              onnxruntime_USE_AVX512=OFF
+
+          - name: linux-x64-noavx2
+            runs-on: ubuntu-24.04
+            cmake_flags: >-
+              onnxruntime_USE_AVX=OFF
+              onnxruntime_USE_AVX2=OFF
+              onnxruntime_USE_AVX512=OFF
+
+          - name: linux-arm64
+            runs-on: ubuntu-24.04-arm
+            cmake_flags: >-
+              onnxruntime_USE_AVX=OFF
+              onnxruntime_USE_AVX2=OFF
+              onnxruntime_USE_AVX512=OFF
+
+    runs-on: ${{ matrix.runs-on }}
+    name: Build (${{ matrix.name }})
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build python3 python3-pip git
+
+      - name: Clone OnnxRuntime
+        run: |
+          git clone --recursive https://github.com/microsoft/onnxruntime
+          cd onnxruntime
+          git checkout ${{ needs.check-version.outputs.version }}
+
+      - name: Build
+        run: |
+          cd onnxruntime
+          EXTRA_DEFINES=$(echo "${{ matrix.cmake_flags }}" | \
+            tr ' ' '\n' | sed 's/^/-D/' | tr '\n' ' ')
+          ./build.sh \
+            --config Release \
+            --build_shared_lib \
+            --parallel \
+            --skip_tests \
+            --compile_no_warning_as_error \
+            --cmake_extra_defines $EXTRA_DEFINES
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p output
+          cp onnxruntime/build/Linux/Release/libonnxruntime.so* output/
+          cp -r onnxruntime/include/onnxruntime output/include
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-${{ needs.check-version.outputs.version }}
+          path: output/
+
+  release:
+    needs: [check-version, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Package artifacts
+        run: |
+          cd artifacts
+          for dir in */; do
+            tar -czf "${dir%/}.tar.gz" "$dir"
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-version.outputs.version }}-custom
+          name: "OnnxRuntime ${{ needs.check-version.outputs.version }} (multi-target)"
+          body: |
+            Auto build, includes:
+            - linux-x64-avx2: x86_64 with AVX2 (modern Intel/AMD)
+            - linux-x64-noavx2: x86_64 without AVX2 (legacy CPUs)
+            - linux-arm64: ARM64 (Raspberry Pi 4/5, AWS Graviton, etc.)
+          files: artifacts/*.tar.gz
+
+      - name: Save built version
+        run: |
+          echo "${{ needs.check-version.outputs.version }}" > .last-built-version
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .last-built-version
+          git commit -m "chore: built ${{ needs.check-version.outputs.version }}"
+          git push
