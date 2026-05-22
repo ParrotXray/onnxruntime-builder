@@ -51,6 +51,10 @@ jobs:
             runs-on: ubuntu-24.04
             cmake_flags: "onnxruntime_USE_AVX=ON onnxruntime_USE_AVX2=ON onnxruntime_USE_AVX512=OFF"
 
+          - name: linux-amd64-avx
+            runs-on: ubuntu-24.04
+            cmake_flags: "onnxruntime_USE_AVX=ON onnxruntime_USE_AVX2=OFF onnxruntime_USE_AVX512=OFF"
+
           - name: linux-amd64-noavx2
             runs-on: ubuntu-24.04
             cmake_flags: "onnxruntime_USE_AVX=OFF onnxruntime_USE_AVX2=OFF onnxruntime_USE_AVX512=OFF"
@@ -129,6 +133,7 @@ jobs:
             Auto build, includes:
             - linux-amd64-all: x86_64 with AVX/AVX2/AVX512 (modern Intel/AMD)
             - linux-amd64-avx2: x86_64 with AVX2 (modern Intel/AMD)
+            - linux-amd64-noavx2: x86_64 with AVX (legacy CPUs)
             - linux-amd64-noavx2: x86_64 without AVX2 (legacy CPUs)
             - linux-aarch64: ARM64 (Raspberry Pi 4/5, AWS Graviton, etc.)
           files: artifacts/*.tar.gz
