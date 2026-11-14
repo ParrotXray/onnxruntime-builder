@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/build-onnxruntime.yml'
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 24 * * *'
   workflow_dispatch:
 
 jobs:
